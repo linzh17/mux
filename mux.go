@@ -31,17 +31,17 @@ func NewRouter() *Router {
 // It implements the http.Handler interface, so it can be registered to serve
 // requests:
 //
-//     var router = mux.NewRouter()
+//	var router = mux.NewRouter()
 //
-//     func main() {
-//         http.Handle("/", router)
-//     }
+//	func main() {
+//	    http.Handle("/", router)
+//	}
 //
 // Or, for Google App Engine, register it in a init() function:
 //
-//     func init() {
-//         http.Handle("/", router)
-//     }
+//	func init() {
+//	    http.Handle("/", router)
+//	}
 //
 // This will send all incoming requests to the router.
 type Router struct {
@@ -68,6 +68,7 @@ type Router struct {
 	middlewares []middleware
 
 	// configuration shared with `Route`
+	//共享路由配置
 	routeConf
 }
 
@@ -135,7 +136,9 @@ func copyRouteRegexp(r *routeRegexp) *routeRegexp {
 // will be filled in the match argument's MatchErr field. If the match failure type
 // (eg: not found) has a registered handler, the handler is assigned to the Handler
 // field of the match argument.
+// 从route表中进行匹配
 func (r *Router) Match(req *http.Request, match *RouteMatch) bool {
+	//遍历routes 如果匹配到则返回true 退出
 	for _, route := range r.routes {
 		if route.Match(req, match) {
 			// Build middleware chain if no error was found

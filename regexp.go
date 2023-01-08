@@ -40,6 +40,7 @@ const (
 // name and pattern can't be empty, and names can't contain a colon.
 func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*routeRegexp, error) {
 	// Check if it is well-formed.
+	//braceIndices判断{ }是否成对并且正确出现，idxs是'{' '}'在表达式tpl中的下标数组
 	idxs, errBraces := braceIndices(tpl)
 	if errBraces != nil {
 		return nil, errBraces
@@ -47,6 +48,9 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 	// Backup the original.
 	template := tpl
 	// Now let's parse it.
+	//默认匹配规则，当{}中没有匹配规则时则使用默认匹配规则 e.g {userid}
+	//{userid:[0-9]+},这种就不需要使用默认匹配规则
+	// 默认匹配路由路径
 	defaultPattern := "[^/]+"
 	if typ == regexpTypeQuery {
 		defaultPattern = ".*"
@@ -63,20 +67,30 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 		tpl = tpl[:len(tpl)-1]
 		endSlash = true
 	}
+	//保存所需要提取的所有变量名称
 	varsN := make([]string, len(idxs)/2)
+	//保存对应变量的regexp规则
 	varsR := make([]*regexp.Regexp, len(idxs)/2)
 	pattern := bytes.NewBufferString("")
 	pattern.WriteByte('^')
 	reverse := bytes.NewBufferString("")
+	// end }的索引位置
 	var end int
 	var err error
 	for i := 0; i < len(idxs); i += 2 {
 		// Set all values we are interested in.
-		raw := tpl[end:idxs[i]]
+		//e.g. tpl "/products/list/{index1}-{index2}"
+		raw := tpl[end:idxs[i]] //"/products/list/" ，"-"
 		end = idxs[i+1]
+
+		// 对{}中的字符串根据进行分割 e.g {userid},{userid:[0-9]+}
+		//parts 就是变量名以及正则表达式对
 		parts := strings.SplitN(tpl[idxs[i]+1:end-1], ":", 2)
+		//变量名称
 		name := parts[0]
-		patt := defaultPattern
+		//正则模式串
+		patt := defaultPattern //[^/]+
+		//如果part长度为2，则存在提供的正则模式串 e.g. {userid:[0-9]+} 中patt为[0-9]+
 		if len(parts) == 2 {
 			patt = parts[1]
 		}
@@ -86,9 +100,14 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 				tpl[idxs[i]:end])
 		}
 		// Build the regexp pattern.
+		//QuoteMeta 将字符串 s 中的“特殊字符”转换为其“转义格式”
+		// pattern e.g. "/products/list/(?P<v0>[^/]+)-(?P<v1>[^/]+)"
+		// "%s(?P<%s>%s)" e.g. "/products/list/(?P<v0>[^/]+)","-(?P<v1>[^/]+)"
 		fmt.Fprintf(pattern, "%s(?P<%s>%s)", regexp.QuoteMeta(raw), varGroupName(i/2), patt)
 
 		// Build the reverse template.
+		//"%s%%s" e.g. "products/list/%s","-%s"
+		//reverse "products/list/%s-%s"
 		fmt.Fprintf(reverse, "%s%%s", raw)
 
 		// Append variable name and compiled pattern.
@@ -99,17 +118,20 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 		}
 	}
 	// Add the remaining.
+	//路径剩余部分
 	raw := tpl[end:]
 	pattern.WriteString(regexp.QuoteMeta(raw))
 	if options.strictSlash {
 		pattern.WriteString("[/]?")
 	}
+	//query 参数匹配
 	if typ == regexpTypeQuery {
 		// Add the default pattern if the query value is empty
 		if queryVal := strings.SplitN(template, "=", 2)[1]; queryVal == "" {
 			pattern.WriteString(defaultPattern)
 		}
 	}
+	//前缀匹配
 	if typ != regexpTypePrefix {
 		pattern.WriteByte('$')
 	}
@@ -120,11 +142,13 @@ func newRouteRegexp(tpl string, typ regexpType, options routeRegexpOptions) (*ro
 			wildcardHostPort = true
 		}
 	}
+	// 路径剩余部分
 	reverse.WriteString(raw)
 	if endSlash {
 		reverse.WriteByte('/')
 	}
 	// Compile full regexp.
+	//完整匹配规则
 	reg, errCompile := regexp.Compile(pattern.String())
 	if errCompile != nil {
 		return nil, errCompile
@@ -284,6 +308,8 @@ func (r *routeRegexp) matchQueryString(req *http.Request) bool {
 func braceIndices(s string) ([]int, error) {
 	var level, idx int
 	var idxs []int
+	//level 用于记录最外层{}
+	//判断{}是否成对出现，并记录每一对{}的idx位置。
 	for i := 0; i < len(s); i++ {
 		switch s[i] {
 		case '{':
@@ -320,6 +346,7 @@ type routeRegexpGroup struct {
 	queries []*routeRegexp
 }
 
+// setMatch extracts the variables from the URL once a route matches.
 // setMatch extracts the variables from the URL once a route matches.
 func (v routeRegexpGroup) setMatch(req *http.Request, m *RouteMatch, r *Route) {
 	// Store host variables.
