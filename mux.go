@@ -68,7 +68,7 @@ type Router struct {
 	middlewares []middleware
 
 	// configuration shared with `Route`
-	//共享路由配置
+	//共享路由配置，应为每个route可能会进行修改，所以需要deepcopy函数进行深拷贝
 	routeConf
 }
 
@@ -86,6 +86,7 @@ type routeConf struct {
 	skipClean bool
 
 	// Manager for the variables from host and path.
+	//用于存储变量
 	regexp routeRegexpGroup
 
 	// List of matchers.
@@ -142,6 +143,7 @@ func (r *Router) Match(req *http.Request, match *RouteMatch) bool {
 	for _, route := range r.routes {
 		if route.Match(req, match) {
 			// Build middleware chain if no error was found
+			//应用中间件
 			if match.MatchErr == nil {
 				for i := len(r.middlewares) - 1; i >= 0; i-- {
 					match.Handler = r.middlewares[i].Middleware(match.Handler)
@@ -199,7 +201,9 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var match RouteMatch
 	var handler http.Handler
 	if r.Match(req, &match) {
+		// 从routematch 获取handler
 		handler = match.Handler
+		//通过context 设置vars,route
 		req = requestWithVars(req, match.Vars)
 		req = requestWithRoute(req, match.Route)
 	}
@@ -473,6 +477,11 @@ func cleanPath(p string) string {
 	}
 	np := path.Clean(p)
 	// path.Clean removes trailing slash except for root;
+	// 1.将连续的多个斜杠替换为单个斜杠
+	// 2. 剔除每一个.路径名元素（代表当前目录）
+	// 3. 剔除每一个路径内的..路径名元素（代表父目录）和它前面的非..路径名元素
+	// 4. 剔除开始一个根路径的..路径名元素，即将路径开始处的"/.."替换为"/"
+	// 5. 会把路径末尾的/剔除
 	// put the trailing slash back if necessary.
 	if p[len(p)-1] == '/' && np != "/" {
 		np += "/"

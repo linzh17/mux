@@ -347,7 +347,6 @@ type routeRegexpGroup struct {
 }
 
 // setMatch extracts the variables from the URL once a route matches.
-// setMatch extracts the variables from the URL once a route matches.
 func (v routeRegexpGroup) setMatch(req *http.Request, m *RouteMatch, r *Route) {
 	// Store host variables.
 	if v.host != nil {
@@ -369,10 +368,16 @@ func (v routeRegexpGroup) setMatch(req *http.Request, m *RouteMatch, r *Route) {
 	}
 	// Store path variables.
 	if v.path != nil {
+		//FindStringSubmatchIndex
+		//查找 re 中编译好的正则表达式，并返回第一个匹配的位置
+		// 同时返回子表达式匹配的位置
+		// {完整项起始, 完整项结束, 子项起始, 子项结束, 子项起始, 子项结束, ...}
 		matches := v.path.regexp.FindStringSubmatchIndex(path)
 		if len(matches) > 0 {
+			//提取Vars
 			extractVars(path, matches, v.path.varsN, m.Vars)
 			// Check if we should redirect.
+			// 判断是否需要重定向
 			if v.path.options.strictSlash {
 				p1 := strings.HasSuffix(path, "/")
 				p2 := strings.HasSuffix(v.path.template, "/")

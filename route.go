@@ -96,6 +96,7 @@ func (r *Route) Match(req *http.Request, match *RouteMatch) bool {
 	}
 
 	// Set variables.
+	//设置相关变量
 	r.regexp.setMatch(req, match, r)
 	return true
 }
@@ -201,6 +202,7 @@ func (r *Route) addRegexpMatcher(tpl string, typ regexpType) error {
 			return err
 		}
 	}
+	//将routeregexp 添加到 RouteRegexpGroup
 	if typ == regexpTypeHost {
 		if r.regexp.path != nil {
 			if err = uniqueVars(rr.varsN, r.regexp.path.varsN); err != nil {
